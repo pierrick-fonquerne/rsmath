@@ -62,6 +62,44 @@ impl Matrix {
 
         Ok(result)
     }
+
+    pub fn sub(&self, other: &Matrix) -> Result<Self, &'static str> {
+        if self.rows != other.rows || self.cols != other.cols {
+            return Err("Matrix dimensions do not match");
+        }
+
+        let mut result = Matrix::new(self.rows, self.cols)?;
+
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let index = result.index(i, j)?;
+                result.data[index] = self.get(i, j)? - other.get(i, j)?;
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub fn mul(&self, other: &Matrix) -> Result<Self, &'static str> {
+        if self.cols != other.rows {
+            return Err("Matrix dimensions do not match");
+        }
+
+        let mut result = Matrix::new(self.rows, other.cols)?;
+
+        for i in 0..self.rows {
+            for j in 0..other.cols {
+                let mut sum = 0.0;
+                for k in 0..self.cols {
+                    sum += self.get(i, k)? * other.get(k, j)?;
+                }
+                let index = result.index(i, j)?;
+                result.data[index] = sum;
+            }
+        }
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -87,5 +125,31 @@ mod tests {
         let mat2 = Matrix::from_data(2, 3, vec![5.0, 6.0, 7.0, 8.0, 9.0, 10.0]).unwrap();
         let result = mat1.add(&mat2);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_sub() {
+        let mat1 = Matrix::from_data(2, 2, vec![1.0, 2.0, 3.0, 4.0]).unwrap();
+        let mat2 = Matrix::from_data(2, 2, vec![5.0, 6.0, 7.0, 8.0]).unwrap();
+        let result = mat1.sub(&mat2).unwrap();
+        assert_eq!(result.data, vec![-4.0, -4.0, -4.0, -4.0]);
+
+        let mat3 = Matrix::from_data(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        let mat4 = Matrix::from_data(2, 3, vec![6.0, 7.0, 8.0, 9.0, 10.0, 11.0]).unwrap();
+        let result = mat3.sub(&mat4).unwrap();
+        assert_eq!(result.data, vec![-5.0, -5.0, -5.0, -5.0, -5.0, -5.0]);
+    }
+
+    #[test]
+    fn test_mul() {
+        let mat1 = Matrix::from_data(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        let mat2 = Matrix::from_data(3, 2, vec![7.0, 8.0, 9.0, 10.0, 11.0, 12.0]).unwrap();
+        let result = mat1.mul(&mat2).unwrap();
+        assert_eq!(result.data, vec![58.0, 139.0, 116.0, 299.0]);
+
+        let mat3 = Matrix::from_data(2, 2, vec![1.0, 2.0, 3.0, 4.0]).unwrap();
+        let mat4 = Matrix::from_data(2, 2, vec![5.0, 6.0, 7.0, 8.0]).unwrap();
+        let result = mat3.mul(&mat4).unwrap();
+        assert_eq!(result.data, vec![19.0, 43.0, 43.0, 99.0]);
     }
 }
