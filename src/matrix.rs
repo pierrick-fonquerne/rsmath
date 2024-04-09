@@ -1,77 +1,91 @@
-use std::simd::{f64x2, f64x4};
+// rsmath/src/matrix.rs
+
+pub struct Matrix {
+    data: Vec<f64>,
+    rows: usize,
+    cols: usize,
+}
 
 impl Matrix {
-    /// Add two matrices together.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The matrix to add to `self`.
-    ///
-    /// # Returns
-    ///
-    /// A new matrix representing the sum of `self` and `other`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the dimensions of `self` and `other` do not match.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use rsmath::Matrix;
-    ///
-    /// let mat1 = Matrix::new(2, 2, vec![1.0, 2.0, 3.0, 4.0]).unwrap();
-    /// let mat2 = Matrix::new(2, 2, vec![5.0, 6.0, 7.0, 8.0]).unwrap();
-    /// let result = mat1.add(&mat2).unwrap();
-    /// assert_eq!(result.data, vec![6.0, 8.0, 10.0, 12.0]);
-    /// ```
+    pub fn new(rows: usize, cols: usize) -> Result<Self, &'static str> {
+        if rows == 0 || cols == 0 {
+            return Err("Matrix dimensions cannot be zero");
+        }
+
+        Ok(Matrix {
+            data: vec![0.0; rows * cols],
+            rows,
+            cols,
+        })
+    }
+
+    pub fn from_data(rows: usize, cols: usize, data: Vec<f64>) -> Result<Self, &'static str> {
+        if data.len() != rows * cols {
+            return Err("Data length does not match matrix dimensions");
+        }
+
+        Ok(Matrix { data, rows, cols })
+    }
+
+    pub fn index(&self, row: usize, col: usize) -> Result<usize, &'static str> {
+        if row >= self.rows || col >= self.cols {
+            return Err("Index out of bounds");
+        }
+
+        Ok(row * self.cols + col)
+    }
+
+    pub fn get(&self, row: usize, col: usize) -> Result<f64, &'static str> {
+        let index = self.index(row, col)?;
+        Ok(self.data[index])
+    }
+
+    pub fn set(&mut self, row: usize, col: usize, value: f64) -> Result<(), &'static str> {
+        let index = self.index(row, col)?;
+        self.data[index] = value;
+        Ok(())
+    }
+
     pub fn add(&self, other: &Matrix) -> Result<Self, &'static str> {
-        // Check that the dimensions of `self` and `other` match.
         if self.rows != other.rows || self.cols != other.cols {
             return Err("Matrix dimensions do not match");
         }
 
-        // Create a new matrix with the same dimensions as `self`.
         let mut result = Matrix::new(self.rows, self.cols)?;
 
-        // Use SIMD instructions to add the elements of `self` and `other`.
-        let mut i = 0;
-        while i + 3 < self.rows * self.cols {
-            // Load four elements from `self` and `other` into SIMD registers.
-            let a = f64x4::loadu(&self.data[i..]);
-            let b = f64x4::loadu(&other.data[i..]);
-
-            // Add the elements of `a` and `b` using SIMD instructions.
-            let c = a + b;
-
-            // Store the result in `result`.
-            c.store(&mut result.data[i..]);
-
-            // Increment the index by 4.
-            i += 4;
-        }
-
-        // Add any remaining elements using SIMD instructions.
-        while i + 1 < self.rows * self.cols {
-            // Load two elements from `self` and `other` into SIMD registers.
-            let a = f64x2::loadu(&self.data[i..]);
-            let b = f64x2::loadu(&other.data[i..]);
-
-            // Add the elements of `a` and `b` using SIMD instructions.
-            let c = a + b;
-
-            // Store the result in `result`.
-            c.store(&mut result.data[i..]);
-
-            // Increment the index by 2.
-            i += 2;
-        }
-
-        // Add any remaining element using scalar instructions.
-        if i < self.rows * self.cols {
-            result.data[i] = self.data[i] + other.data[i];
+        for i in 0..self.rows {
+            for j in 0..self.cols {
+                let index = result.index(i, j)?;
+                result.data[index] = self.get(i, j)? + other.get(i, j)?;
+            }
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        let mat1 = Matrix::from_data(2, 2, vec![1.0, 2.0, 3.0, 4.0]).unwrap();
+        let mat2 = Matrix::from_data(2, 2, vec![5.0, 6.0, 7.0, 8.0]).unwrap();
+        let result = mat1.add(&mat2).unwrap();
+        assert_eq!(result.data, vec![6.0, 8.0, 10.0, 12.0]);
+
+        let mat3 = Matrix::from_data(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]).unwrap();
+        let mat4 = Matrix::from_data(2, 3, vec![6.0, 7.0, 8.0, 9.0, 10.0, 11.0]).unwrap();
+        let result = mat3.add(&mat4).unwrap();
+        assert_eq!(result.data, vec![7.0, 9.0, 11.0, 13.0, 15.0, 17.0]);
+    }
+
+    #[test]
+    fn test_add_error() {
+        let mat1 = Matrix::from_data(2, 2, vec![1.0, 2.0, 3.0, 4.0]).unwrap();
+        let mat2 = Matrix::from_data(2, 3, vec![5.0, 6.0, 7.0, 8.0, 9.0, 10.0]).unwrap();
+        let result = mat1.add(&mat2);
+        assert!(result.is_err());
     }
 }
